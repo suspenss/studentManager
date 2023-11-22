@@ -1,8 +1,10 @@
-#include "manager.hpp"
-#include "server.hpp"
+#include "../include/manager.hpp"
+#include "../include/server.hpp"
 #include <iostream>
 
 int main(int argc, char *argv[]) {
+    std::cout << "have" << argc << "arguments\n";
+
     constexpr const char *open_message = R"(
 StudentManager with zzuli.
   _________ __            .___             __       _____                                             
@@ -15,11 +17,11 @@ StudentManager with zzuli.
 
     std::cout << open_message << std::endl;
 
-    init_manager();
-    start_server(argv[1], argv[2]);
+    manager::init_manager();
+    server::start_server(argv[1], argv[2]);
 
-    process_client();
-    exit_server();
+    server::process_client();
+    server::exit_server();
 
     return 0;
 }

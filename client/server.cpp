@@ -1,9 +1,10 @@
-#include "../socket.hpp"
+#include "../include/socket.hpp"
 #include <iostream>
 #include <thread>
+
 // local
 
-static SocketServer CLIENT {};
+static network::SocketServer CLIENT {};
 
 void client_reader(int socket_fd) {
     while (true) {
@@ -41,7 +42,7 @@ void process() {
         std::getline(std::cin, information);
 
         // Add proper error handling for write
-        if (write(CLIENT.get_socket(), information.c_str(), information.size()) < 0) {
+        if (send(CLIENT.get_socket(), information.c_str(), information.size(), 0) < 0) {
             std::cerr << "Error writing to socket" << std::endl;
             break;
         }
