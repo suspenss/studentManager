@@ -1,5 +1,7 @@
 #include <iostream>
+#include <mutex>
 #include <mysql/mysql.h>
+#include <shared_mutex>
 #include <string>
 
 ///此行显示可异步工作
@@ -42,6 +44,8 @@ class StudentManager {
     MYSQL database;
     /// @brief todo
     int socket_fd;
+    /// Ensure that the operations performed are atomic operations
+    mutable std::shared_mutex _mutex;
 
     StudentManager() {}
 
@@ -95,6 +99,7 @@ class StudentManager {
     }
 
     bool add(Student s) {
+        std::lock_guard<std::shared_mutex> lock(_mutex);
         std::string query(1024, '\0');
         sprintf(&query[0],
             "insert into users(name, studentnumber, age, chinese, math, english) values('%s', %d, %d, '%s', %d, %d, %d);",
@@ -107,15 +112,18 @@ class StudentManager {
     }
 
     bool remove() {
+        std::unique_lock<std::shared_mutex> lock(_mutex);
         // todo
         return false;
     }
 
     bool modify() {
+        std::unique_lock<std::shared_mutex> lock(_mutex);
         return false;
     }
 
     bool search() {
+        std::shared_lock<std::shared_mutex> lock(_mutex);
         return false;
     }
 };

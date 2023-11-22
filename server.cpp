@@ -2,9 +2,19 @@
 #include "socket.hpp"
 #include <cstring>
 #include <iostream>
+#include <thread>
 #include <unistd.h>
 
 static SocketServer STUDENT_MANAGER_SERVER {};
+
+thread_local int THREAD_SOCKET;
+
+void handle_client(int socket) {
+    std::string buffer(100, '\0');
+    while (recv(socket, &buffer[0], buffer.size(), 0) > 0) {
+        /// 处理客户端的请求，并展示提示性的信息，调用相关函数
+    }
+}
 
 void start_server(char *port, char *ipaddr) {
     STUDENT_MANAGER_SERVER.init(port, ipaddr);
@@ -15,16 +25,13 @@ int server_socket() {
 }
 
 void process_client() {
-    struct sockaddr_in clientAddress;
-    socklen_t clientAddressLength = sizeof(clientAddress);
+    SocketServer client_address;
     while (true) {
-        int clientSocket = accept(server_socket(), (struct sockaddr *)&clientAddress, &clientAddressLength);
-
-        if (clientSocket == -1) {
-            std::cerr << "accept is fail: " << std::endl;
-            exit(0);
+        if (STUDENT_MANAGER_SERVER.accept_server(client_address)) {
+            std::cout << "有新的客户端连接: " << client_address.get_socket() << std::endl;
+            std::thread read_thread(handle_client, client_address.get_socket());
+            read_thread.detach();
         }
-        std::cout << "有新的客户端连接: " << clientSocket << std::endl;
 
         constexpr const char *msg = R"(
 /********************/
@@ -37,6 +44,6 @@ void process_client() {
 /*********************/
 )";
 
-        write(clientSocket, msg, std::strlen(msg));
+        write(client_address.get_socket(), msg, std::strlen(msg));
     }
 }

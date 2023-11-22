@@ -1,6 +1,6 @@
 // server.hpp
-#ifndef SERVER_HPP
-#define SERVER_HPP
+#ifndef SOCKET_HPP
+#define SOCKET_HPP
 
 #include <arpa/inet.h>
 #include <iostream>
@@ -8,7 +8,7 @@
 
 class SocketServer {
   private:
-    sockaddr_in server;
+    sockaddr_in server = {};
     int server_socket;
 
   public:
@@ -25,7 +25,7 @@ class SocketServer {
         int port = atoi(arg_port);
         server.sin_family = AF_INET;
         server.sin_port = htons(port);
-        server.sin_addr.s_addr = inet_addr(arg_ipaddress);
+        inet_pton(server_socket, arg_ipaddress, &server.sin_addr);
 
         if (bind(server_socket, (struct sockaddr *)&server, sizeof(struct sockaddr_in)) == -1) {
             std::cerr << "bind is fail " << std::endl;
@@ -38,9 +38,22 @@ class SocketServer {
         }
     }
 
-    int get_socket() {
+    bool accept_server(SocketServer &client) {
+        socklen_t clientAddressLength = sizeof(client.server);
+
+        client.server_socket = accept(server_socket, (struct sockaddr *)&client.server, &clientAddressLength);
+
+        if (client.server_socket == -1) {
+            std::cerr << "accept is fail: " << std::endl;
+            exit(0);
+        }
+
+        return true;
+    }
+
+    int get_socket() const {
         return server_socket;
     }
 };
 
-#endif    // SERVER_HPP
+#endif    // SOCKET_HPP
