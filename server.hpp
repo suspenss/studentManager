@@ -1,11 +1,10 @@
-// server.hpp
-#ifndef SERVER_HPP
-#define SERVER_HPP
-
-class Server;
+#ifndef MANAGER_SERVER_HPP
+#define MANAGER_SERVER_HPP
 
 void start_server(char *port, char *ipaddr);
 
-int server_sock_fd();
+int server_socket();
 
-#endif    // SERVER_HPP
+void process_client();
+
+#endif    // MANAGER_SERVER_HPP

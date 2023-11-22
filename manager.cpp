@@ -21,7 +21,7 @@ struct Student {
 
     /// @brief the function get the sexual as string literal
     /// @return the sexual string literal, man return "male", woman return "female", another return "unknow"
-    const char *sexual() {
+    const char *sexual() const {
         if (_sexual == Sexual::female) {
             return "female";
         } else if (_sexual == Sexual::male) {
@@ -94,9 +94,9 @@ class StudentManager {
 
     bool add(Student s) {
         std::string query(1024, '\0');
-        sprintf(query.data(),
+        sprintf(&query[0],
             "insert into users(name, studentnumber, age, chinese, math, english) values('%s', %d, %d, '%s', %d, %d, %d);",
-            s.name, s.number, s.age, s.sexual(), s.chinese, s.math, s.english);
+            s.name.data(), s.number, s.age, s.sexual(), s.chinese, s.math, s.english);
 
         auto [query_state, result] = mysql_query(query);
         std::cout << "Add student information: " << result << std::endl;
