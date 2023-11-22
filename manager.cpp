@@ -2,6 +2,8 @@
 #include <mysql/mysql.h>
 #include <string>
 
+///此行显示可异步工作
+
 /// @brief this a simple enum that construct a Sexual
 enum Sexual {
     female,
