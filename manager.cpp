@@ -3,6 +3,8 @@
 #include <mysql/mysql.h>
 #include <shared_mutex>
 #include <string>
+/// local
+#include "server.hpp"
 
 ///此行显示可异步工作
 
@@ -136,7 +138,7 @@ void init_manager() {
 
 bool add() {
     Student s;
-
+    std::cout << THREAD_SOCKET;
     return STUDENT_MANAGER.add(s);
 }
 
