@@ -10,7 +10,7 @@ void client_reader(int socket_fd) {
     while (true) {
         std::string buffer(1024, '\0');
 
-        size_t byte_received = read(socket_fd, &buffer[0], sizeof(buffer));
+        size_t byte_received = recv(socket_fd, &buffer[0], sizeof(buffer), 0);
 
         if (byte_received > 0) {
             std::cout << buffer << std::endl;

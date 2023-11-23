@@ -3,13 +3,16 @@
 #include <mysql/mysql.h>
 #include <shared_mutex>
 #include <string>
+#include <string_view>
+#include <sys/socket.h>
+#include <vector>
 /// local
 #include "../include/server.hpp"
 
 ///此行显示可异步工作
 namespace manager {
-    /// @brief this a simple enum that construct a Sexual
-    enum Sexual {
+    /// @brief this a simple enum that construct a Gender
+    enum Gender {
         female,
         male,
     };
@@ -17,22 +20,22 @@ namespace manager {
     /// @brief this is a student struct, which storage the information for student.
     struct Student {
         /// @brief student name
-        std::string name;
+        std::string name, number;
         /// @brief student sexual
-        Sexual sexual_;
+        Gender gender_;
         /// @brief student age and number
         /// @brief student grade about math, chinese english ...
-        unsigned int age, number, math, chinese, english;
+        unsigned int age, math, chinese, english;
 
         /// @brief the function get the sexual as string literal
         /// @return the sexual string literal, man return "male", woman return "female", another return "unknow"
-        const char *sexual() const {
-            if (sexual_ == Sexual::female) {
+        const char *gender() const {
+            if (gender_ == Gender::female) {
                 return "female";
-            } else if (sexual_ == Sexual::male) {
+            } else if (gender_ == Gender::male) {
                 return "male";
             } else {
-                return "unknow";
+                return "unknown";
             }
         }
     };
@@ -95,17 +98,46 @@ namespace manager {
             if (mysql_real_query(&database, query_info.c_str(), query_info.size()) == 0) {
                 return {true, std::string("success !")};
             } else {
-                /// mysql_error() return a string to describ error information
                 return {false, std::string(mysql_error(&database))};
             }
         }
 
-        bool add(Student s) {
+        std::pair<bool, std::string> mysql_result() {
+            std::string info_result;
+            MYSQL_RES *result = mysql_store_result(&database);
+
+            if (result == nullptr) {
+                std::cerr << "mysql_store_result(): " << mysql_error(&database) << std::endl;
+                return {false, "error"};
+            }
+
+            int num_fields = mysql_num_fields(result);
+            MYSQL_FIELD *fields = mysql_fetch_fields(result);
+            for (int i = 0; i < num_fields; ++i) {
+                info_result += fields[i].name;
+                info_result += '\t';
+            }
+            info_result += '\n';
+
+            MYSQL_ROW row;
+            while ((row = mysql_fetch_row(result)) != nullptr) {
+                for (int i = 0; i < num_fields; ++i) {
+                    info_result += row[i];
+                    info_result += '\t';
+                }
+                info_result += '\n';
+            }
+
+            mysql_free_result(result);
+            return {true, info_result};
+        }
+
+        bool add(Student &s) {
             std::unique_lock<std::shared_mutex> lock(mutex_);
             std::string query(1024, '\0');
             sprintf(&query[0],
-                "insert into users(name, studentnumber, age, chinese, math, english) values('%s', %d, %d, '%s', %d, %d, %d);",
-                s.name.data(), s.number, s.age, s.sexual(), s.chinese, s.math, s.english);
+                "insert into users(name, studentnumber, age, chinese, math, english) values('%s', '%s', %d, '%s', %d, %d, %d);",
+                s.name.data(), s.number.data(), s.age, s.gender(), s.chinese, s.math, s.english);
 
             auto [query_state, result] = mysql_query(query);
             std::cout << "Add student information: " << result << std::endl;
@@ -113,10 +145,15 @@ namespace manager {
             return query_state;
         }
 
-        bool remove() {
+        bool remove(std::string_view delete_name) {
             std::unique_lock<std::shared_mutex> lock(mutex_);
-            // todo
-            return false;
+            std::string query(1024, '\0');
+            sprintf(&query[0], "delete from users where studentnumber = '%s';", delete_name.data());
+
+            auto [query_state, result] = mysql_query(query);
+            std::cout << "Delete student information: " << result << std::endl;
+
+            return query_state;
         }
 
         bool modify() {
@@ -124,9 +161,24 @@ namespace manager {
             return false;
         }
 
-        bool search() {
+        std::pair<bool, std::string> search_as(std::string_view key, std::string_view query_info) {
             std::shared_lock<std::shared_mutex> lock(mutex_);
-            return false;
+
+            std::string query(120, '\0');
+            sprintf(&query[0], "SELECT * FROM users where %s = %s;", key.data(), query_info.data());
+            auto [query_state, query_result] = mysql_query(query);
+
+            std::cout << "Search as" << key << " : " << query_result << std::endl;
+
+            auto [storage_state, storage_result] = mysql_result();
+
+            return {storage_state and query_state, storage_result};
+        }
+
+        std::pair<bool, std::string> show() {
+            std::shared_lock<std::shared_mutex> lock(mutex_);
+            mysql_query("SELECT * FROM users");
+            return mysql_result();
         }
     };
 
@@ -136,28 +188,89 @@ namespace manager {
         StudentManager::instance().init();
     }
 
-    bool add() {
-        Student s;
-        std::cout << THREAD_SOCKET;
-        // todo
-        // 此函数需要进行 socket 通信，可以访问线程本地变量 THREAD_SOCKET 来获得
-        // 这个线程的客户端套接字。
-        // 通过 write 和 read 函数和客户端通信，获得一个学生的信息即可
-        return StudentManager::instance().add(s);
+    void handle_client_error(bool state) {
+        std::string_view msg;
+        if (state) {
+            msg = "Operation success!\n";
+        } else {
+            msg = "Operation failed!\n";
+        }
+        send(THREAD_SOCKET, msg.data(), msg.size(), 0);
     }
 
-    bool modify() {
-        // todo
-        return StudentManager::instance().modify();
+    void add() {
+        std::string send_msg {"添加学生信息\n"};
+        send(THREAD_SOCKET, send_msg.c_str(), send_msg.size(), 0);
+
+        std::vector<std::string> send_msg_item {"学生姓名", "学生学号", "学生性别，[男/女]", "学生年龄",
+            "学生成绩：数学成绩", "学生成绩：语文成绩", "学生成绩：英语成绩"};
+
+        std::vector<std::string> student_info_vec;
+        for (auto &item : send_msg_item) {
+            std::string send_msg {"请输入信息：" + item};
+            send(THREAD_SOCKET, send_msg.c_str(), send_msg.size(), 0);
+
+            std::string recv_msg(200, '\0');
+            auto recv_len = recv(THREAD_SOCKET, &recv_msg[0], recv_msg.size(), 0);
+            std::cout << recv_msg << '\n';
+            recv_msg.resize(recv_len);
+            student_info_vec.emplace_back(recv_msg);
+        }
+
+        send_msg = "确认添加吗？[yes/no]\n";
+        send(THREAD_SOCKET, send_msg.c_str(), send_msg.size(), 0);
+
+        std::string confirm_info(10, '\0');
+        recv(THREAD_SOCKET, &confirm_info[0], confirm_info.size(), 0);
+
+        bool state = false;
+        if (confirm_info.find("yes") or confirm_info.find("no") == -1) {
+            Student s;
+            s.name = student_info_vec[0];
+            s.number = student_info_vec[1];
+            s.gender_ = student_info_vec[2].find("男") == -1 ? Gender::female : Gender::male;
+            s.age = std::stoi(student_info_vec[3]);
+            s.math = std::stoi(student_info_vec[4]);
+            s.english = std::stoi(student_info_vec[5]);
+            s.chinese = std::stoi(student_info_vec[6]);
+            state = StudentManager::instance().add(s);
+        }
+
+        handle_client_error(state);
     }
 
-    bool remove() {
-        // todo
-        return StudentManager::instance().remove();
+    void modify() {
+        StudentManager::instance().modify();
     }
 
-    bool search() {
-        // todo
-        return StudentManager::instance().search();
+    void search() {
+        std::string send_msg {"查询学生\n 请输入要查询的学生姓名\n"};
+        send(THREAD_SOCKET, send_msg.c_str(), send_msg.size(), 0);
+        std::string recv_msg(100, '\0');
+        recv(THREAD_SOCKET, &recv_msg[0], recv_msg.size(), 0);
+        std::string key {"name"};
+        auto [state, result] = StudentManager::instance().search_as(key, recv_msg);
+        handle_client_error(state);
+        if (state) {
+            send(THREAD_SOCKET, result.c_str(), result.size(), 0);
+        }
+    }
+
+    void show() {
+        auto [state, result] = StudentManager::instance().show();
+        if (send(THREAD_SOCKET, result.data(), result.size(), 0) < 0) {
+            state = false;
+        }
+        handle_client_error(state);
+    }
+
+    void remove() {
+        constexpr std::string_view msg {"请输入要删除的学生的名字"};
+        send(THREAD_SOCKET, msg.data(), msg.size(), 0);
+
+        std::string delete_name(100, '\0');
+        recv(THREAD_SOCKET, &delete_name[0], delete_name.size(), 0);
+        bool state = StudentManager::instance().remove(delete_name);
+        handle_client_error(state);
     }
 }    // namespace manager
