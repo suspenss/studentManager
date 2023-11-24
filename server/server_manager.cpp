@@ -4,6 +4,7 @@
 #include <iostream>
 #include <mutex>
 #include <mysql/mysql.h>
+#include <shared_mutex>
 #include <string>
 #include <string_view>
 #include <sys/socket.h>
@@ -23,7 +24,7 @@ namespace server_manager {
         /// @brief todo
         int socket_fd;
         /// Ensure that the operations performed are atomic operations
-        mutable std::mutex mutex_;
+        mutable std::shared_mutex mutex_;
 
         // 构造函数
         StudentManager() {}
@@ -113,7 +114,7 @@ namespace server_manager {
         }
 
         bool add(manager::Student &s) {
-            std::lock_guard<std::mutex> lock(mutex_);
+            std::lock_guard<std::shared_mutex> lock(mutex_);
             std::string query(1024, '\0');
             sprintf(&query[0],
                 "insert into users(name, studentnumber, gender, age, chinese, math, english) values('%s', '%s', '%s', %d, %d, %d, %d);",
@@ -126,7 +127,7 @@ namespace server_manager {
         }
 
         bool remove(std::string_view delete_name) {
-            std::lock_guard<std::mutex> lock(mutex_);
+            std::unique_lock<std::shared_mutex> lock(mutex_);
             std::string query(1024, '\0');
             sprintf(&query[0], "delete from users where name = '%s';", delete_name.data());
 
@@ -138,7 +139,7 @@ namespace server_manager {
 
         bool modify(std::string_view search_key, std::string_view search_target, std::string_view edit_key_,
             std::string_view edit_target) {
-            std::lock_guard<std::mutex> lock(mutex_);
+            std::unique_lock<std::shared_mutex> lock(mutex_);
 
             std::string query(120, '\0');
             sprintf(&query[0], "update users set %s='%s' where %s ='%s';", edit_key_.data(), edit_target.data(),
@@ -150,7 +151,7 @@ namespace server_manager {
         }
 
         std::pair<bool, std::string> search_as(std::string_view key_, std::string_view query_info) {
-            std::lock_guard<std::mutex> lock(mutex_);
+            std::shared_lock<std::shared_mutex> lock(mutex_);
 
             std::string query(120, '\0');
             sprintf(&query[0], "SELECT * FROM users where %s = '%s';", key_.data(), query_info.data());
@@ -164,7 +165,7 @@ namespace server_manager {
         }
 
         std::pair<bool, std::string> show() {
-            std::lock_guard<std::mutex> lock(mutex_);
+            std::shared_lock<std::shared_mutex> lock(mutex_);
             mysql_query("SELECT * FROM users");
             return mysql_result();
         }
