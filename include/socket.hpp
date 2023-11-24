@@ -10,14 +10,15 @@ namespace network {
     // 以及根据 ip 和 port 初始化操作，bind, listen, accept 操作
     class SocketServer {
       private:
-        sockaddr_in server = {};
+        sockaddr_in server_addr = {};
         int server_socket;
 
       public:
         SocketServer() {
             server_socket = socket(AF_INET, SOCK_STREAM, 0);
             if (server_socket == -1) {
-                throw std::runtime_error("Failed to create socket");
+                // throw std::runtime_error("Failed to create socket");
+                exit(0);
             }
 
             std::cout << "Socket server is online!\n";
@@ -30,14 +31,15 @@ namespace network {
         // 初始化，转换端口为数字，并将ip地址转换为网络序，获取套接字，设置套接字地址
         void init(char *arg_port, char *arg_ipaddress) {
             int port = atoi(arg_port);
-            server.sin_family = AF_INET;
-            server.sin_port = htons(port);
-            inet_pton(server_socket, arg_ipaddress, &server.sin_addr);
+            server_addr.sin_family = AF_INET;
+            server_addr.sin_port = htons(port);
+            inet_pton(server_socket, arg_ipaddress, &server_addr.sin_addr);
         }
 
         // 封装了的 bind 和 listen 操作
+        // tcp/ip 协议，三次握手
         void bind_and_listen() {
-            if (bind(server_socket, (struct sockaddr *)&server, sizeof(struct sockaddr_in)) == -1) {
+            if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(struct sockaddr_in)) == -1) {
                 std::cerr << "bind is fail " << std::endl;
                 exit(0);
             }
@@ -52,15 +54,24 @@ namespace network {
 
         /// 当服务器接收到客户端的连接请求时，返回 true 否则会阻塞线程知道错误，退出，和接收到客户端的连接请求
         bool accept_server(SocketServer &client) {
-            socklen_t clientAddressLength = sizeof(client.server);
+            socklen_t clientAddressLength = sizeof(client.server_addr);
 
-            client.server_socket = accept(server_socket, (struct sockaddr *)&client.server, &clientAddressLength);
+            client.server_socket = accept(server_socket, (struct sockaddr *)&client.server_addr, &clientAddressLength);
 
             if (client.server_socket == -1) {
                 std::cerr << "accept is fail: " << std::endl;
                 exit(0);
             }
 
+            return true;
+        }
+
+        bool connect_server() {
+            int ret = connect(server_socket, (struct sockaddr *)&server_addr, sizeof(struct sockaddr_in));
+            if (ret == -1) {
+                std::cerr << "connect is fail: " << std::endl;
+                exit(0);
+            }
             return true;
         }
 

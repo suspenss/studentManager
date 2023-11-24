@@ -15,4 +15,6 @@ namespace manager {
 
     // 搜索学生信息
     bool search();
+
+    bool show();
 }    // namespace manager

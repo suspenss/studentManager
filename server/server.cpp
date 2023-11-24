@@ -16,20 +16,31 @@ namespace server {
     /// 具体的和客户端进行socket 通信的函数，接收客户端的 socket 字节流，并执行相应功能
     void handle_client(int socket) {
         THREAD_SOCKET = socket;
+        constexpr const char *msg = R"(
+-----------------------------------------------------
+1: 显示学生信息
+2: 添加学生信息
+3: 删除学生信息
+4: 修改学生信息
+5: 查找学生信息
+0: 退出
+-----------------------------------------------------
+)";
+        send(THREAD_SOCKET, msg, std::strlen(msg), 0);
         std::string buffer(200, '\0');
         while (recv(socket, &buffer[0], buffer.size(), 0) > 0) {
             std::cout << buffer << '\n';
             // 处理从客户端读到的字符串
             // todo 添加相关提示信息
-            if (buffer.find("add")) {
+            if (buffer.find("add") != -1) {
                 manager::add();
-            } else if (buffer.find("delete")) {
+            } else if (buffer.find("delete") != -1) {
                 manager::remove();
-            } else if (buffer.find("show")) {
-                manager::search();
-            } else if (buffer.find("edit")) {
+            } else if (buffer.find("show") != -1) {
+                manager::show();
+            } else if (buffer.find("edit") != -1) {
                 manager::modify();
-            } else if (buffer.find("find")) {
+            } else if (buffer.find("find") != -1) {
                 manager::search();
             } else {
                 // todo
@@ -62,18 +73,6 @@ namespace server {
                 std::thread read_thread(handle_client, client_address.get_socket());
                 read_thread.detach();
             }
-
-            constexpr const char *msg = R"(
------------------------------------------------------
-1: 显示学生信息
-2: 添加学生信息
-3: 删除学生信息
-4: 修改学生信息
-5: 查找学生信息
-0: 退出
------------------------------------------------------
-)";
-            write(client_address.get_socket(), msg, std::strlen(msg));
         }
     }
 

@@ -1,3 +1,4 @@
+#include <cstring>
 #include <iostream>
 #include <mutex>
 #include <mysql/mysql.h>
@@ -51,9 +52,19 @@ namespace manager {
         /// Ensure that the operations performed are atomic operations
         mutable std::shared_mutex mutex_;
 
+        // a + b
+        // a -> alu
+        // a -> alu
+        // v -> a
+        // v -> a
+
+        // 1 -> 100
+        // a -> thread
+
         StudentManager() {}
 
       public:
+        // 单例模式
         static StudentManager &instance() {
             static StudentManager instance;
             return instance;
@@ -113,9 +124,11 @@ namespace manager {
 
             int num_fields = mysql_num_fields(result);
             MYSQL_FIELD *fields = mysql_fetch_fields(result);
+            // Calculate maximum width for each column
+            // Header
             for (int i = 0; i < num_fields; ++i) {
                 info_result += fields[i].name;
-                info_result += '\t';
+                info_result += "\t\t";
             }
             info_result += '\n';
 
@@ -123,7 +136,7 @@ namespace manager {
             while ((row = mysql_fetch_row(result)) != nullptr) {
                 for (int i = 0; i < num_fields; ++i) {
                     info_result += row[i];
-                    info_result += '\t';
+                    info_result += "\t\t";
                 }
                 info_result += '\n';
             }
@@ -136,8 +149,8 @@ namespace manager {
             std::unique_lock<std::shared_mutex> lock(mutex_);
             std::string query(1024, '\0');
             sprintf(&query[0],
-                "insert into users(name, studentnumber, age, chinese, math, english) values('%s', '%s', %d, '%s', %d, %d, %d);",
-                s.name.data(), s.number.data(), s.age, s.gender(), s.chinese, s.math, s.english);
+                "insert into users(name, studentnumber, gender, age, chinese, math, english) values('%s', '%s', '%s', %d, %d, %d, %d);",
+                s.name.data(), s.number.data(), s.gender(), s.age, s.chinese, s.math, s.english);
 
             auto [query_state, result] = mysql_query(query);
             std::cout << "Add student information: " << result << std::endl;
@@ -148,7 +161,7 @@ namespace manager {
         bool remove(std::string_view delete_name) {
             std::unique_lock<std::shared_mutex> lock(mutex_);
             std::string query(1024, '\0');
-            sprintf(&query[0], "delete from users where studentnumber = '%s';", delete_name.data());
+            sprintf(&query[0], "delete from users where name = '%s';", delete_name.data());
 
             auto [query_state, result] = mysql_query(query);
             std::cout << "Delete student information: " << result << std::endl;
@@ -165,7 +178,7 @@ namespace manager {
             std::shared_lock<std::shared_mutex> lock(mutex_);
 
             std::string query(120, '\0');
-            sprintf(&query[0], "SELECT * FROM users where %s = %s;", key.data(), query_info.data());
+            sprintf(&query[0], "SELECT * FROM users where %s = '%s';", key.data(), query_info.data());
             auto [query_state, query_result] = mysql_query(query);
 
             std::cout << "Search as" << key << " : " << query_result << std::endl;
@@ -240,6 +253,20 @@ namespace manager {
     }
 
     void modify() {
+        std::string send_msg {"修改学生信息\n请输入要修改的学生学号\n"};
+        send(THREAD_SOCKET, send_msg.c_str(), send_msg.size(), 0);
+        std::string recv_number(100, '\0');
+        recv(THREAD_SOCKET, &recv_number[0], recv_number.size(), 0);
+        std::string key {"number"};
+        auto [state, result] = StudentManager::instance().search_as(key, recv_number);
+
+        handle_client_error(state);
+
+        if (state) {
+            send(THREAD_SOCKET, result.c_str(), result.size(), 0);
+        } else {
+        }
+
         StudentManager::instance().modify();
     }
 
@@ -261,6 +288,7 @@ namespace manager {
         if (send(THREAD_SOCKET, result.data(), result.size(), 0) < 0) {
             state = false;
         }
+        std::cout << result;
         handle_client_error(state);
     }
 
@@ -270,6 +298,7 @@ namespace manager {
 
         std::string delete_name(100, '\0');
         recv(THREAD_SOCKET, &delete_name[0], delete_name.size(), 0);
+
         bool state = StudentManager::instance().remove(delete_name);
         handle_client_error(state);
     }

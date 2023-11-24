@@ -3,7 +3,7 @@
 #include <iostream>
 
 int main(int argc, char *argv[]) {
-    std::cout << "have" << argc << "arguments\n";
+    std::cout << "have " << argc << " arguments\n";
 
     constexpr const char *open_message = R"(
 StudentManager with zzuli.
@@ -19,7 +19,7 @@ StudentManager with zzuli.
 
     manager::init_manager();
     server::start_server(argv[1], argv[2]);
-
+    manager::show();
     server::process_client();
     server::exit_server();
 
