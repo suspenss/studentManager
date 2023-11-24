@@ -14,7 +14,7 @@ CLIENT_OBJ := $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_DIR)/%.o,$(CLIENT_SRC))
 SERVER_OBJ := $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_DIR)/%.o,$(SERVER_SRC))
 
 IP_ADDRESS ?= 127.0.0.1
-PORT ?= 9998
+PORT ?= 9999
 
 # Targets
 all: client server

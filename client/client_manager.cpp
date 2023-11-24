@@ -139,11 +139,66 @@ namespace client_manager {
     void modify() {
         send_operation("edit");
 
-        std::cout << "修改学生信息：请输入要选择修改的学生姓名\nedit student)";
-        std::string edit_name;
-        std::getline(std::cin, edit_name);
+        std::cout << "修改学生信息：请输入要选择修改的学生学号\nedit student)";
+        std::string edit_number;
+        std::getline(std::cin, edit_number);
         // 发送要修改的学生姓名
-        client_server::Send(edit_name);
-        // send(client_server::server_socket(), edit_name.c_str(), edit_name.size(), 0);
+        client_server::Send(edit_number);
+
+        if (handle_state()) {
+            std::string recv_msg;
+            client_server::Recv(recv_msg);
+            std::cout << "查找成功，已经找到你要修改的对象\n" << recv_msg << "\nedit student)";
+            constexpr const char *menu = R"(
+----------------------------------------------------------------------------
+[1]: 修改姓名, [2]: 修改年龄, [3]: 修改性别, [4] : 修改成绩, [0]: 退出修改
+----------------------------------------------------------------------------
+)";
+            auto handle_error = [](bool state) {
+                if (state) {
+                    std::cout << "修改操作成功\n";
+                } else {
+                    std::cout << "修改失败, 请重试\n";
+                }
+            };
+
+            while (true) {
+                std::cout << menu << '\n' << "etid student)";
+
+                std::string operation;
+                std::getline(std::cin, operation);
+                std::cout << operation << '\n';
+                if (operation.find("1") != std::string::npos) {
+                    // 修改姓名
+                    std::cout << "修改姓名\n";
+                    std::string edit_key {"name"};
+                    client_server::Send(edit_key);
+
+                    std::string target;
+                    std::cout << "请输入修改后的姓名\nedit student)";
+                    std::getline(std::cin, target);
+                    client_server::Send(target);
+                    handle_error(handle_state());
+                } else if (operation.find("3") != std::string::npos) {
+                    // 修改性别
+                    std::cout << "修改性别\n";
+                    std::string edit_key {"gender"};
+                    client_server::Send(edit_key);
+
+                    std::string target;
+                    std::cout << "请输入修改后的性别\nedit student)";
+                    std::getline(std::cin, target);
+                    client_server::Send(target);
+                    handle_error(handle_state());
+                } else if (operation.find("0") != std::string::npos) {
+                    // 退出修改
+                    std::cout << "退出修改\n";
+                    break;
+                }
+            }
+        } else {
+            std::cout << "查找失败\n";
+        }
+        // send(client_server::server_socket(), edit_number.c_str(), edit_number.size(), 0);
     }
 }    // namespace client_manager

@@ -136,19 +136,27 @@ namespace server_manager {
             return query_state;
         }
 
-        bool modify() {
-            std::lock_guard<std::mutex> lock(mutex_);
-            return false;
-        }
-
-        std::pair<bool, std::string> search_as(std::string_view key, std::string_view query_info) {
+        bool modify(std::string_view search_key, std::string_view search_target, std::string_view edit_key_,
+            std::string_view edit_target) {
             std::lock_guard<std::mutex> lock(mutex_);
 
             std::string query(120, '\0');
-            sprintf(&query[0], "SELECT * FROM users where %s = '%s';", key.data(), query_info.data());
+            sprintf(&query[0], "update users set %s='%s' where %s ='%s';", edit_key_.data(), edit_target.data(),
+                search_key.data(), search_target.data());
+
+            auto [query_state, result] = mysql_query(query);
+            std::cout << "Modify student information: " << result << std::endl;
+            return query_state;
+        }
+
+        std::pair<bool, std::string> search_as(std::string_view key_, std::string_view query_info) {
+            std::lock_guard<std::mutex> lock(mutex_);
+
+            std::string query(120, '\0');
+            sprintf(&query[0], "SELECT * FROM users where %s = '%s';", key_.data(), query_info.data());
             auto [query_state, query_result] = mysql_query(query);
 
-            std::cout << "Search as" << key << " : " << query_result << std::endl;
+            std::cout << "Search as" << key_ << " : " << query_result << std::endl;
 
             auto [storage_state, storage_result] = mysql_result();
             std::cout << storage_result << std::endl;
@@ -173,7 +181,7 @@ namespace server_manager {
         if (state) {
             msg = "true";
         } else {
-            msg = "true";
+            msg = "false";
         }
         server::Send(msg);
         // send(THREAD_SOCKET, msg.data(), msg.size(), 0);
@@ -199,33 +207,13 @@ namespace server_manager {
         }
     }
 
-    void modify() {
-        std::string send_msg {"修改学生信息\n请输入要修改的学生学号\n"};
-        server::Send(send_msg);
-        // send(THREAD_SOCKET, send_msg.c_str(), send_msg.size(), 0);
-        std::string recv_number;
-        server::Recv(recv_number);
-        // recv(THREAD_SOCKET, &recv_number[0], recv_number.size(), 0);
-        std::string key {"number"};
-        auto [state, result] = StudentManager::instance().search_as(key, recv_number);
-
-        handle_client_error(state);
-        // TODO
-        // if (state) {
-        //     send(THREAD_SOCKET, result.c_str(), result.size(), 0);
-        // } else {
-        // }
-
-        StudentManager::instance().modify();
-    }
-
     void search() {
         std::string recv_msg;
         server::Recv(recv_msg);
         // recv(THREAD_SOCKET, &recv_msg[0], recv_msg.size(), 0);
-        std::string key {"name"};
+        std::string key_ {"studentnumber"};
         std::cout << recv_msg;
-        auto [state, result] = StudentManager::instance().search_as(key, recv_msg);
+        auto [state, result] = StudentManager::instance().search_as(key_, recv_msg);
         handle_client_error(state);
         std::cout << state << ' ' << result << ' ' << THREAD_SOCKET << std::endl;
         if (state) {
@@ -252,5 +240,27 @@ namespace server_manager {
 
         bool state = StudentManager::instance().remove(delete_name);
         handle_client_error(state);
+    }
+
+    void modify() {
+        std::string recv_number;
+        server::Recv(recv_number);
+        // recv(THREAD_SOCKET, &recv_number[0], recv_number.size(), 0);
+        std::string key_ {"studentnumber"};
+        auto [state, result] = StudentManager::instance().search_as(key_, recv_number);
+
+        handle_client_error(state);
+
+        if (state) {
+            server::Send(result);
+
+            std::string edit_key, target;
+            server::Recv(edit_key);
+            server::Recv(target);
+            std::cout << edit_key << " here is key, here is tar" << target << '\n';
+            bool state = StudentManager::instance().modify(key_, recv_number, edit_key, target);
+
+            handle_client_error(state);
+        }
     }
 }    // namespace server_manager
