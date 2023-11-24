@@ -2,7 +2,6 @@
 #include <iostream>
 #include <mutex>
 #include <mysql/mysql.h>
-#include <shared_mutex>
 #include <string>
 #include <string_view>
 #include <sys/socket.h>
@@ -50,7 +49,7 @@ namespace manager {
         /// @brief todo
         int socket_fd;
         /// Ensure that the operations performed are atomic operations
-        mutable std::shared_mutex mutex_;
+        mutable std::mutex mutex_;
 
         // a + b
         // a -> alu
@@ -146,7 +145,7 @@ namespace manager {
         }
 
         bool add(Student &s) {
-            std::unique_lock<std::shared_mutex> lock(mutex_);
+            std::lock_guard<std::mutex> lock(mutex_);
             std::string query(1024, '\0');
             sprintf(&query[0],
                 "insert into users(name, studentnumber, gender, age, chinese, math, english) values('%s', '%s', '%s', %d, %d, %d, %d);",
@@ -159,7 +158,7 @@ namespace manager {
         }
 
         bool remove(std::string_view delete_name) {
-            std::unique_lock<std::shared_mutex> lock(mutex_);
+            std::lock_guard<std::mutex> lock(mutex_);
             std::string query(1024, '\0');
             sprintf(&query[0], "delete from users where name = '%s';", delete_name.data());
 
@@ -170,12 +169,12 @@ namespace manager {
         }
 
         bool modify() {
-            std::unique_lock<std::shared_mutex> lock(mutex_);
+            std::lock_guard<std::mutex> lock(mutex_);
             return false;
         }
 
         std::pair<bool, std::string> search_as(std::string_view key, std::string_view query_info) {
-            std::shared_lock<std::shared_mutex> lock(mutex_);
+            std::lock_guard<std::mutex> lock(mutex_);
 
             std::string query(120, '\0');
             sprintf(&query[0], "SELECT * FROM users where %s = '%s';", key.data(), query_info.data());
@@ -189,7 +188,7 @@ namespace manager {
         }
 
         std::pair<bool, std::string> show() {
-            std::shared_lock<std::shared_mutex> lock(mutex_);
+            std::lock_guard<std::mutex> lock(mutex_);
             mysql_query("SELECT * FROM users");
             return mysql_result();
         }
