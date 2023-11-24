@@ -1,3 +1,5 @@
+#include <arpa/inet.h>
+#include <cstddef>
 #include <cstring>
 #include <iostream>
 #include <mutex>
@@ -7,39 +9,11 @@
 #include <sys/socket.h>
 #include <vector>
 /// local
-#include "../include/server.hpp"
+#include "../include/server_manager.hpp"
+#include "../include/server_server.hpp"
+#include "../include/student.hpp"
 
-///此行显示可异步工作
-namespace manager {
-    /// @brief this a simple enum that construct a Gender
-    enum Gender {
-        female,
-        male,
-    };
-
-    /// @brief this is a student struct, which storage the information for student.
-    struct Student {
-        /// @brief student name
-        std::string name, number;
-        /// @brief student sexual
-        Gender gender_;
-        /// @brief student age and number
-        /// @brief student grade about math, chinese english ...
-        unsigned int age, math, chinese, english;
-
-        /// @brief the function get the sexual as string literal
-        /// @return the sexual string literal, man return "male", woman return "female", another return "unknow"
-        const char *gender() const {
-            if (gender_ == Gender::female) {
-                return "female";
-            } else if (gender_ == Gender::male) {
-                return "male";
-            } else {
-                return "unknown";
-            }
-        }
-    };
-
+namespace server_manager {
     /// @brief studentManager manage the student system, connect the mysql database and give the interface to client to
     /// manage student system
     class StudentManager {
@@ -51,15 +25,7 @@ namespace manager {
         /// Ensure that the operations performed are atomic operations
         mutable std::mutex mutex_;
 
-        // a + b
-        // a -> alu
-        // a -> alu
-        // v -> a
-        // v -> a
-
-        // 1 -> 100
-        // a -> thread
-
+        // 构造函数
         StudentManager() {}
 
       public:
@@ -68,7 +34,9 @@ namespace manager {
             static StudentManager instance;
             return instance;
         }
-
+        ~StudentManager() {
+            mysql_close(&database);
+        }
         /// @brief init the struct
         void init() {
             /// link the database and system mysql service
@@ -144,12 +112,12 @@ namespace manager {
             return {true, info_result};
         }
 
-        bool add(Student &s) {
+        bool add(manager::Student &s) {
             std::lock_guard<std::mutex> lock(mutex_);
             std::string query(1024, '\0');
             sprintf(&query[0],
                 "insert into users(name, studentnumber, gender, age, chinese, math, english) values('%s', '%s', '%s', %d, %d, %d, %d);",
-                s.name.data(), s.number.data(), s.gender(), s.age, s.chinese, s.math, s.english);
+                s.name.c_str(), s.number.c_str(), s.gender.c_str(), s.age, s.chinese, s.math, s.english);
 
             auto [query_state, result] = mysql_query(query);
             std::cout << "Add student information: " << result << std::endl;
@@ -183,7 +151,7 @@ namespace manager {
             std::cout << "Search as" << key << " : " << query_result << std::endl;
 
             auto [storage_state, storage_result] = mysql_result();
-
+            std::cout << storage_result << std::endl;
             return {storage_state and query_state, storage_result};
         }
 
@@ -203,102 +171,86 @@ namespace manager {
     void handle_client_error(bool state) {
         std::string_view msg;
         if (state) {
-            msg = "Operation success!\n";
+            msg = "true";
         } else {
-            msg = "Operation failed!\n";
+            msg = "true";
         }
-        send(THREAD_SOCKET, msg.data(), msg.size(), 0);
+        server::Send(msg);
+        // send(THREAD_SOCKET, msg.data(), msg.size(), 0);
     }
 
     void add() {
-        std::string send_msg {"添加学生信息\n"};
-        send(THREAD_SOCKET, send_msg.c_str(), send_msg.size(), 0);
+        std::cout << "add function" << std::endl;
+        std::string recv_info;
+        server::Recv(recv_info);
+        // recv(THREAD_SOCKET, &recv_info[0], recv_info.size(), 0);
+        std::cout << "RECV: (add func)" << recv_info << '\n';
 
-        std::vector<std::string> send_msg_item {"学生姓名", "学生学号", "学生性别，[男/女]", "学生年龄",
-            "学生成绩：数学成绩", "学生成绩：语文成绩", "学生成绩：英语成绩"};
-
-        std::vector<std::string> student_info_vec;
-        for (auto &item : send_msg_item) {
-            std::string send_msg {"请输入信息：" + item};
-            send(THREAD_SOCKET, send_msg.c_str(), send_msg.size(), 0);
-
-            std::string recv_msg(200, '\0');
-            auto recv_len = recv(THREAD_SOCKET, &recv_msg[0], recv_msg.size(), 0);
-            std::cout << recv_msg << '\n';
-            recv_msg.resize(recv_len);
-            student_info_vec.emplace_back(recv_msg);
+        if (recv_info.find("true") != std::string::npos) {
+            std::string recv_student;
+            server::Recv(recv_student);
+            // recv(THREAD_SOCKET, &recv_student[0], recv_student.size(), 0);
+            std::cout << "RECV: " << recv_student << '\n';
+            // recv_student.resize(recv_len);
+            manager::Student s = manager::Student::deserializeStudent(recv_student);
+            bool state = StudentManager::instance().add(s);
+            handle_client_error(state);
+            std::cout << "here!";
         }
-
-        send_msg = "确认添加吗？[yes/no]\n";
-        send(THREAD_SOCKET, send_msg.c_str(), send_msg.size(), 0);
-
-        std::string confirm_info(10, '\0');
-        recv(THREAD_SOCKET, &confirm_info[0], confirm_info.size(), 0);
-
-        bool state = false;
-        if (confirm_info.find("yes") or confirm_info.find("no") == -1) {
-            Student s;
-            s.name = student_info_vec[0];
-            s.number = student_info_vec[1];
-            s.gender_ = student_info_vec[2].find("男") == -1 ? Gender::female : Gender::male;
-            s.age = std::stoi(student_info_vec[3]);
-            s.math = std::stoi(student_info_vec[4]);
-            s.english = std::stoi(student_info_vec[5]);
-            s.chinese = std::stoi(student_info_vec[6]);
-            state = StudentManager::instance().add(s);
-        }
-
-        handle_client_error(state);
     }
 
     void modify() {
         std::string send_msg {"修改学生信息\n请输入要修改的学生学号\n"};
-        send(THREAD_SOCKET, send_msg.c_str(), send_msg.size(), 0);
-        std::string recv_number(100, '\0');
-        recv(THREAD_SOCKET, &recv_number[0], recv_number.size(), 0);
+        server::Send(send_msg);
+        // send(THREAD_SOCKET, send_msg.c_str(), send_msg.size(), 0);
+        std::string recv_number;
+        server::Recv(recv_number);
+        // recv(THREAD_SOCKET, &recv_number[0], recv_number.size(), 0);
         std::string key {"number"};
         auto [state, result] = StudentManager::instance().search_as(key, recv_number);
 
         handle_client_error(state);
-
-        if (state) {
-            send(THREAD_SOCKET, result.c_str(), result.size(), 0);
-        } else {
-        }
+        // TODO
+        // if (state) {
+        //     send(THREAD_SOCKET, result.c_str(), result.size(), 0);
+        // } else {
+        // }
 
         StudentManager::instance().modify();
     }
 
     void search() {
-        std::string send_msg {"查询学生\n 请输入要查询的学生姓名\n"};
-        send(THREAD_SOCKET, send_msg.c_str(), send_msg.size(), 0);
-        std::string recv_msg(100, '\0');
-        recv(THREAD_SOCKET, &recv_msg[0], recv_msg.size(), 0);
+        std::string recv_msg;
+        server::Recv(recv_msg);
+        // recv(THREAD_SOCKET, &recv_msg[0], recv_msg.size(), 0);
         std::string key {"name"};
+        std::cout << recv_msg;
         auto [state, result] = StudentManager::instance().search_as(key, recv_msg);
         handle_client_error(state);
+        std::cout << state << ' ' << result << ' ' << THREAD_SOCKET << std::endl;
         if (state) {
-            send(THREAD_SOCKET, result.c_str(), result.size(), 0);
+            server::Send(result);
+            // send(THREAD_SOCKET, result.c_str(), result.size(), 0);
         }
     }
 
     void show() {
         auto [state, result] = StudentManager::instance().show();
-        if (send(THREAD_SOCKET, result.data(), result.size(), 0) < 0) {
-            state = false;
-        }
-        std::cout << result;
         handle_client_error(state);
+
+        server::Send(result);
+        // send(THREAD_SOCKET, result.c_str(), result.size(), 0);
+
+        std::cout << result;
+        std::cout << std::endl << result.size() << '\n';
     }
 
     void remove() {
-        constexpr std::string_view msg {"请输入要删除的学生的名字"};
-        send(THREAD_SOCKET, msg.data(), msg.size(), 0);
-
-        std::string delete_name(100, '\0');
-        recv(THREAD_SOCKET, &delete_name[0], delete_name.size(), 0);
+        std::string delete_name;
+        server::Recv(delete_name);
+        // recv(THREAD_SOCKET, &delete_name[0], delete_name.size(), 0);
 
         bool state = StudentManager::instance().remove(delete_name);
         handle_client_error(state);
     }
-}    // namespace manager
+}    // namespace server_manager

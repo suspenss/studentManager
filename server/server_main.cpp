@@ -1,5 +1,5 @@
-#include "../include/manager.hpp"
-#include "../include/server.hpp"
+#include "../include/server_manager.hpp"
+#include "../include/server_server.hpp"
 #include <iostream>
 
 int main(int argc, char *argv[]) {
@@ -17,9 +17,9 @@ StudentManager with zzuli.
 
     std::cout << open_message << std::endl;
 
-    manager::init_manager();
+    server_manager::init_manager();
     server::start_server(argv[1], argv[2]);
-    manager::show();
+    server_manager::show();
     server::process_client();
     server::exit_server();
 

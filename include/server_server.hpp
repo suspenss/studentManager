@@ -1,4 +1,6 @@
 #pragma once
+#include <string_view>
+#include <sys/types.h>
 
 namespace server {
     // 运行服务器
@@ -12,6 +14,10 @@ namespace server {
 
     // 退出服务器，关闭套接字
     void exit_server();
+
+    auto Send(std::string_view) -> ssize_t;
+
+    auto Recv(std::string &) -> ssize_t;
 }    // namespace server
 
 extern thread_local int THREAD_SOCKET;

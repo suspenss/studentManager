@@ -5,7 +5,7 @@
 #include <unistd.h>
 // local header
 
-namespace network {
+namespace tcp {
     // socket服务器，封装了 socket 通信的 套接字，地址等参数
     // 以及根据 ip 和 port 初始化操作，bind, listen, accept 操作
     class SocketServer {
@@ -83,4 +83,4 @@ namespace network {
             close(server_socket);
         }
     };
-}    // namespace network
+}    // namespace tcp

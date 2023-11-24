@@ -1,20 +1,20 @@
 #pragma once
 
-namespace manager {
+namespace server_manager {
     // 初始化学生管理器
     void init_manager();
 
     // 添加学生信息
-    bool add();
+    void add();
 
     // 修改学生信息
-    bool modify();
+    void modify();
 
     // 删除学生信息
-    bool remove();
+    void remove();
 
     // 搜索学生信息
-    bool search();
+    void search();
 
-    bool show();
-}    // namespace manager
+    void show();
+}    // namespace server_manager
